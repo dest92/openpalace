@@ -197,11 +197,11 @@ def query(
                 typer.echo(" | ".join(str(row.get(h, "")) for h in headers))
 
 
-def _create_context_bundle(ctx: dict, seed_file: str) -> ContextBundle:
+def _create_context_bundle(provider_context: dict, seed_file: str) -> ContextBundle:
     """Create enriched ContextBundle from provider context."""
     # Convert invariants
     invariants = []
-    for inv in ctx.get('related_invariants', []):
+    for inv in provider_context.get('related_invariants', []):
         invariants.append(Invariant(
             id=inv.get('rule', 'unknown')[:20],
             rule=inv['rule'],
@@ -213,10 +213,13 @@ def _create_context_bundle(ctx: dict, seed_file: str) -> ContextBundle:
 
     # Convert artifacts
     artifacts = []
-    for art in ctx.get('related_artifacts', []):
+    for art in provider_context.get('related_artifacts', []):
         relation_type = "related"
-        if 'depends' in str(art).lower():
+        art_str = str(art).lower()
+        if 'depends' in art_str:
             relation_type = "depends_on"
+        elif 'impact' in art_str:
+            relation_type = "depended_by"
         artifacts.append(Artifact(
             path=art['path'],
             language="python",
@@ -226,7 +229,7 @@ def _create_context_bundle(ctx: dict, seed_file: str) -> ContextBundle:
 
     # Convert concepts
     concepts = []
-    for conc in ctx.get('related_concepts', []):
+    for conc in provider_context.get('related_concepts', []):
         concepts.append(Concept(
             name=conc['name'],
             activation=conc.get('energy', 0.5),
@@ -235,7 +238,7 @@ def _create_context_bundle(ctx: dict, seed_file: str) -> ContextBundle:
 
     return ContextBundle(
         seed_file=seed_file,
-        total_activation=ctx.get('total_activated', 0),
+        total_activation=provider_context.get('total_activated', 0),
         risk_score=len([i for i in invariants if i.severity in ["CRITICAL", "HIGH"]]) * 0.2,
         invariants=invariants,
         topological_neighbors=artifacts,
