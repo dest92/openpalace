@@ -2,6 +2,7 @@
 .palace/
 *.kuzu
 *.db
+.worktrees/
 
 # Python
 __pycache__/
