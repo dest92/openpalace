@@ -42,38 +42,82 @@ class ParserRegistry:
         Register built-in parsers.
 
         Automatically registers all available language parsers.
-        Tree-sitter parsers must have their grammars installed to work.
+        Tries tree-sitter parsers first, falls back to regex parsers.
         """
         from palace.ingest.parsers.python import PythonParser
 
         # Register Python parser (always available - uses stdlib ast)
         self.register(PythonParser(), language="python")
 
-        # Register tree-sitter based parsers
-        # These will only work if their grammars are installed
+        # Register JavaScript parser (try tree-sitter, fallback to regex)
+        js_parser_working = False
         try:
             from palace.ingest.parsers.javascript import JavaScriptParser
             js_parser = JavaScriptParser()
-            if js_parser.is_available():
+            # Test if parser actually works by parsing simple code
+            # Use code that SHOULD extract symbols
+            test_code = "function test() { return 1; }"
+            test_result = js_parser.extract_symbols(test_code)
+            # Only use tree-sitter if it actually extracts symbols
+            if len(test_result) > 0:
                 self.register(js_parser, language="javascript")
+                js_parser_working = True
         except Exception:
-            pass  # JavaScript parser not available
+            pass
 
+        # Fallback to regex parser if tree-sitter not available/working
+        if not js_parser_working:
+            try:
+                from palace.ingest.parsers.javascript_regex import JavaScriptRegexParser
+                self.register(JavaScriptRegexParser(), language="javascript")
+            except Exception:
+                pass
+
+        # Register TypeScript parser (try tree-sitter, fallback to regex)
+        ts_parser_working = False
         try:
             from palace.ingest.parsers.typescript import TypeScriptParser
             ts_parser = TypeScriptParser()
-            if ts_parser.is_available():
+            # Test if parser actually works
+            test_code = "interface Test { x: number; }"
+            test_result = ts_parser.extract_symbols(test_code)
+            # Only use tree-sitter if it actually extracts symbols
+            if len(test_result) > 0:
                 self.register(ts_parser, language="typescript")
+                ts_parser_working = True
         except Exception:
-            pass  # TypeScript parser not available
+            pass
 
+        # Fallback to regex parser if tree-sitter not available/working
+        if not ts_parser_working:
+            try:
+                from palace.ingest.parsers.typescript_regex import TypeScriptRegexParser
+                self.register(TypeScriptRegexParser(), language="typescript")
+            except Exception:
+                pass
+
+        # Register Go parser (try tree-sitter, fallback to regex)
+        go_parser_working = False
         try:
             from palace.ingest.parsers.go import GoParser
             go_parser = GoParser()
-            if go_parser.is_available():
+            # Test if parser actually works
+            test_code = "package main\n\nfunc main() {}"
+            test_result = go_parser.extract_symbols(test_code)
+            # Only use tree-sitter if it actually extracts symbols
+            if len(test_result) > 0:
                 self.register(go_parser, language="go")
+                go_parser_working = True
         except Exception:
-            pass  # Go parser not available
+            pass
+
+        # Fallback to regex parser if tree-sitter not available/working
+        if not go_parser_working:
+            try:
+                from palace.ingest.parsers.go_regex import GoRegexParser
+                self.register(GoRegexParser(), language="go")
+            except Exception:
+                pass
 
     def register(self, parser: BaseParser, language: Optional[str] = None) -> None:
         """

@@ -32,16 +32,27 @@ class TreeSitterParser(BaseParser):
 
         Subclasses must override this to set self._language.
         """
+        # Don't initialize yet - wait for subclass to set _language
+        pass
+
+    def _create_parser(self) -> None:
+        """
+        Create the tree-sitter parser with the language.
+
+        Must be called after self._language is set.
+        """
+        if not self._language:
+            return
+
         try:
             import tree_sitter
-            self._parser = tree_sitter.Parser()
-            if self._language:
-                self._parser.set_language(self._language)
+            # IMPORTANT: Pass language to constructor, not set_language()
+            # The language object is a PyCapsule that must be passed to Parser()
+            self._parser = tree_sitter.Parser(self._language)
         except ImportError:
-            # tree-sitter not available - parser will be disabled
+            # tree-sitter not available
             self._parser = None
-        except Exception as e:
-            # Language-specific grammar not installed
+        except Exception:
             self._parser = None
 
     def _parse_tree(self, content: str) -> Optional[Any]:
@@ -145,6 +156,29 @@ class TreeSitterParser(BaseParser):
             result += self._serialize_node(child, content, indent + 1)
 
         return result
+
+    def _print_tree(self, node: Any, content: str, max_depth: int = 3, current_depth: int = 0) -> None:
+        """
+        Print tree structure for debugging.
+
+        Args:
+            node: Tree-sitter node to print
+            content: Full source code content
+            max_depth: Maximum depth to print
+            current_depth: Current depth
+        """
+        if not node or current_depth >= max_depth:
+            return
+
+        prefix = "  " * current_depth
+        node_text = self._get_node_text(node, content)
+        if len(node_text) > 50:
+            node_text = node_text[:50] + "..."
+
+        print(f"{prefix}{node.type}: {repr(node_text)}")
+
+        for child in node.children:
+            self._print_tree(child, content, max_depth, current_depth + 1)
 
     def compute_fingerprint(self, content: str) -> str:
         """

@@ -19,8 +19,8 @@ class TypeScriptParser(TreeSitterParser):
         try:
             import tree_sitter_typescript
             self._language = tree_sitter_typescript.language_typescript()
-            if self._parser:
-                self._parser.set_language(self._language)
+            # Create parser with language
+            self._create_parser()
         except ImportError:
             # tree-sitter-typescript not installed
             self._language = None

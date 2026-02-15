@@ -19,8 +19,8 @@ class JavaScriptParser(TreeSitterParser):
         try:
             import tree_sitter_javascript
             self._language = tree_sitter_javascript.language()
-            if self._parser:
-                self._parser.set_language(self._language)
+            # Create parser with language
+            self._create_parser()
         except ImportError:
             # tree-sitter-javascript not installed
             self._language = None
