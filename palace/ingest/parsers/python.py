@@ -21,7 +21,8 @@ class PythonParser(BaseParser):
         if not TREE_SITTER_AVAILABLE:
             raise ImportError("tree-sitter-python not installed")
 
-        self.language = Language(tspython.language())
+        # New tree-sitter API requires library_path and name
+        self.language = Language(tspython.language_path(), "python")
         self.parser = Parser(self.language)
 
     def supported_extensions(self) -> List[str]:
