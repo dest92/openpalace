@@ -288,7 +288,10 @@ class Hippocampus:
             List of result rows as dicts
         """
         result = self.kuzu_conn.execute(query, params)
-        return [dict(row) for row in result]
+        # Use built-in rows_as_dict method and convert to list
+        if result and result.has_next():
+            return list(result.rows_as_dict())
+        return []
 
     def store_embedding(self, node_id: str, embedding: np.ndarray) -> None:
         """
