@@ -190,3 +190,102 @@ class Hippocampus:
         """Context manager exit."""
         self.close()
         return False
+
+    def create_node(self, node_type: str, properties: Dict) -> str:
+        """
+        Create a node in the graph.
+
+        Args:
+            node_type: Type of node (Concept, Artifact, etc.)
+            properties: Dictionary of node properties
+
+        Returns:
+            The ID of the created node
+        """
+        # Build parameterized query - KuzuDB needs explicit parameter references
+        prop_list = ", ".join([f"{k}: ${k}" for k in properties.keys()])
+        query = f"CREATE (n:{node_type} {{{prop_list}}})"
+        self.kuzu_conn.execute(query, properties)
+        return properties["id"]
+
+    def create_edge(
+        self,
+        src_id: str,
+        dst_id: str,
+        edge_type: str,
+        properties: Dict
+    ) -> None:
+        """
+        Create an edge between two nodes.
+
+        Args:
+            src_id: Source node ID
+            dst_id: Destination node ID
+            edge_type: Type of edge (EVOKES, DEPENDS_ON, etc.)
+            properties: Edge properties
+        """
+        # Build properties string
+        if properties:
+            prop_list = ", ".join([f"{k}: ${k}" for k in properties.keys()])
+            # Need to escape braces for f-string
+            query = f"""
+                MATCH (src), (dst)
+                WHERE src.id = $src_id AND dst.id = $dst_id
+                CREATE (src)-[r:{edge_type} {{prop_list}}]->(dst)
+            """
+            query = query.replace("{prop_list}", "{" + prop_list + "}")
+            params = {
+                "src_id": src_id,
+                "dst_id": dst_id,
+                **properties
+            }
+        else:
+            query = f"""
+                MATCH (src), (dst)
+                WHERE src.id = $src_id AND dst.id = $dst_id
+                CREATE (src)-[r:{edge_type}]->(dst)
+            """
+            params = {
+                "src_id": src_id,
+                "dst_id": dst_id
+            }
+        self.kuzu_conn.execute(query, params)
+
+    def get_node(self, node_id: str) -> Optional[Dict]:
+        """
+        Get a node by ID.
+
+        Args:
+            node_id: Node ID to retrieve
+
+        Returns:
+            Node properties dict or None if not found
+        """
+        query = "MATCH (n) WHERE n.id = $node_id RETURN n"
+        result = self.kuzu_conn.execute(query, {"node_id": node_id})
+        try:
+            row = next(result)
+            # KuzuDB returns results - row[0] contains the node data
+            node_data = row[0]
+            # If it's a list, it contains column values
+            if isinstance(node_data, list):
+                # Get column names from the result
+                columns = result.getColumns()
+                return {col.getName(): node_data[i] for i, col in enumerate(columns)}
+            return node_data
+        except StopIteration:
+            return None
+
+    def execute_cypher(self, query: str, params: Dict) -> List[Dict]:
+        """
+        Execute a Cypher query.
+
+        Args:
+            query: Cypher query string
+            params: Query parameters
+
+        Returns:
+            List of result rows as dicts
+        """
+        result = self.kuzu_conn.execute(query, params)
+        return [dict(row) for row in result]
