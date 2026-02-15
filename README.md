@@ -1,194 +1,266 @@
-# Palacio Mental v2.0
+# OpenPalace
 
-A bio-mimetic cognitive memory system for code engineering teams using graph databases, vector embeddings, and Hebbian learning algorithms.
+OpenPalace turns large codebases into a persistent, queryable memory that understands relationships, intent, and context.
 
-## Features
+Ask any file: **"What will break if I change you?"** and get an answer in 100ms.
 
-- **Graph-Based Memory**: Uses KuzuDB for storing code relationships as a knowledge graph
-- **Vector Embeddings**: SQLite+vec for semantic similarity search
-- **Spreading Activation**: Cognitive navigation algorithm for discovering related code
-- **Hebbian Learning**: Automatic strengthening of connections between co-activated concepts
-- **Sleep Cycle**: Consolidation and forgetting mechanism for memory optimization
-- **Code Ingestion**: Parse Python code with tree-sitter to extract symbols and dependencies
-- **Context Provider**: LLM assistance through contextual code information
+---
 
-## Installation
+## The Real Problem
 
-```bash
-# Install dependencies
-pip install kuzu sqlite-vec sentence-transformers tree-sitter tree-sitter-python
+You're working on a codebase you didn't write. You need to:
 
-# Or with Poetry
-poetry install
-```
+- **Understand impact:** "If I refactor `database.py`, what breaks?"
+- **Navigate unfamiliar code:** "Where is authentication actually handled?"
+- **Onboard quickly:** "How does this system fit together?"
+- **Avoid breaking things:** "What depends on this function?"
 
-## Usage
+Current tools don't help much:
+- `grep` shows text matches, not relationships
+- IDEs show one file at a time, not the system
+- Documentation is outdated or missing
+- Asking seniors takes time everyone lacks
 
-### Initialize Repository
+You spend hours reading code just to understand what you can safely touch.
 
-```bash
-poetry run palace init
-```
+---
 
-### Ingest Code
+## What OpenPalace Does
 
-```bash
-# Ingest all Python files
-poetry run palace ingest
+OpenPalace ingests your code and builds a knowledge graph that persists between sessions.
 
-# Ingest specific pattern
-poetry run palace ingest --file-pattern "src/**/*.py"
-```
+**What it gives you:**
 
-### Get Context
+1. **Impact analysis** — Query any file and see exactly what depends on it
+2. **Contextual navigation** — Discover related files through dependency traversal
+3. **Architectural awareness** — See connections, risks, and relationships before making changes
+4. **AI integration** — Export structured context that LLMs can use to give better answers
 
-```bash
-# Get full architectural context (rich Markdown)
-poetry run palace context src/auth.py
+**What it works with:**
+- Python code today (more languages in progress)
+- Local-only, runs on your machine
+- Works offline after initial setup
 
-# Get compact one-line context
-poetry run palace context src/auth.py --compact
+---
 
-# Save context to file
-poetry run palace context src/auth.py -o /tmp/context.md
-```
-
-### Run Sleep Cycle
+## Try It in 3 Minutes
 
 ```bash
-# Run consolidation and pruning
-poetry run palace sleep
-```
-
-### Statistics and Queries
-
-```bash
-# Show brain statistics
-poetry run palace stats
-
-# Execute raw Cypher query
-poetry run palace query "MATCH (n) RETURN count(n)"
-```
-
-## Architecture
-
-### Storage Layer (Hippocampus)
-- **KuzuDB**: Graph database for nodes (Concept, Artifact, Invariant, Decision, Anchor) and edges
-- **SQLite+vec**: Vector database for semantic similarity search
-
-### Core Algorithms
-- **ActivationEngine**: BFS-based spreading activation with configurable depth and energy thresholds
-- **PlasticityEngine**: Hebbian learning ("neurons that fire together, wire together")
-- **SleepEngine**: Consolidation, pruning, and forgetting mechanisms
-
-### Ingestion Pipeline
-- **PythonParser**: Tree-sitter based parsing for Python code
-- **ConceptExtractor**: Extracts concepts using sentence-transformers
-- **InvariantDetector**: Detects architectural violations
-- **BigBangPipeline**: Orchestrates the complete ingestion process
-
-### API & CLI
-- **ContextProvider**: Provides contextual information for LLM assistance
-- **CLI Commands**: init, ingest, context, sleep
-
-## Quick Start (5 minutes)
-
-```bash
-# Clone and install
+# Install
 git clone https://github.com/dest92/openpalace.git
 cd openpalace
 poetry install
 
-# Or use automated setup
-python setup_palace.py
+# Go to your project
+cd /path/to/your-project
 
-# In your project
-cd /path/to/your/project
-poetry run palace init
-poetry run palace ingest
-poetry run palace context src/file.py
+# Initialize and ingest
+palace init
+palace ingest --file-pattern "src/**/*.py"
 ```
 
-See [docs/QUICKSTART.md](docs/QUICKSTART.md) for detailed guide.
+Now ask questions your editor can't answer:
+
+### Question 1: "What will break if I change this file?"
+
+```bash
+$ palace context src/database/connection.py
+## Architectural Context (OpenPalace)
+**Seed**: src/database/connection.py | **Total Activation**: 8.32 | **Risk**: 0.25
+
+### Files That Depend on This:
+• src/auth/login.py (IMPORT) — distance: 1
+• src/api/routes.py (IMPORT) — distance: 1
+• src/api/middleware.py (IMPORT) — distance: 2
+
+### Active Concepts:
+• Database Connection ████████ 1.00
+• Data Access Layer ██████░ 0.78
+
+### Risk Level: Medium (0.25)
+⚠️ 2 files directly depend on this module
+```
+
+**Translation:** You have 3 files to test. You won't break anything else.
+
+### Question 2: "How do I understand this file's role?"
+
+```bash
+$ palace context src/auth/login.py --compact
+Context: src/auth/login.py (risk: 0.15) | Concepts: Authentication, Security | Depends on: src/database/connection.py | Impacts: src/api/routes.py
+```
+
+**Translation:** `login.py` is authentication logic, depends on the database, and is used by the API routes.
+
+### Question 3: "What's the architecture here?"
+
+```bash
+$ palace query "MATCH (a)-[r:DEPENDS_ON]->(b) RETURN a.path as from, b.path as to LIMIT 10"
+
+from                    │ to
+─────────────────────────────────────────────────
+src/api/routes.py    → src/auth/login.py
+src/api/routes.py    → src/database/connection.py
+src/auth/login.py    → src/database/connection.py
+src/api/middleware.py → src/auth/jwt_handler.py
+```
+
+**Translation:** A complete dependency map in milliseconds. No manual tracing required.
+
+---
+
+## What Makes It Different
+
+**1. Persistent memory of your code**
+- Unlike `grep` or `find`, OpenPalace builds a graph that accumulates knowledge
+- Relationships stay indexed between sessions
+- You don't rebuild understanding every time you return to a project
+
+**2. Understands relationships, not just text**
+- Knows that `routes.py` *depends on* `auth.py` — not just that both contain "login"
+- Traverses dependencies to show impact chains
+- Surface hidden connections IDEs miss
+
+**3. AI-ready context**
+- Exports structured summaries LLMs can use effectively
+- Works with Claude Code, Cursor, and other AI assistants
+- Gives AI the architectural awareness it needs to provide useful answers
+
+---
+
+## Use Cases
+
+**Developer Onboarding**
+New developers spend 3 weeks understanding codebases. With OpenPalace, they query the graph and see relationships immediately. Onboarding drops to days, not weeks.
+
+**Safe Refactoring**
+Before changing code, run `palace context <file>` to see exactly what depends on it. Write tests for those files first. Refactor with confidence instead of fear.
+
+**Legacy Code Exploration**
+Inherited a project with no documentation? Ingest it and query the graph to understand the architecture without reading every file.
+
+**AI-Assisted Development**
+Using Claude Code or Cursor? Export context from OpenPalace so your AI assistant understands the system architecture, not just the file you're editing.
+
+**Code Review**
+Reviewing a PR? Query what files the changes impact and why. Reviews become architectural, not just syntactic.
+
+---
+
+## Architecture (For the Curious)
+
+OpenPalace combines two storage systems:
+
+**KuzuDB Graph Database**
+- Stores artifacts (files), concepts (semantic meaning), and relationships
+- 5 node types: Artifact, Concept, Invariant, Decision, Anchor
+- 5 edge types: DEPENDS_ON, EVOKES, CONSTRAINS, PRECEDES, RELATED_TO
+
+**SQLite+vec Vector Database**
+- 384-dimensional embeddings for semantic search
+- Finds conceptually similar code across the codebase
+
+**Core Algorithms**
+- **Spreading activation** — BFS traversal to discover related code
+- **Hebbian learning** — Strengthens connections between co-activated concepts
+- **Consolidation cycles** — Prunes weak connections, reinforces strong ones
+
+The system uses tree-sitter (Python AST today) to parse code, extract symbols, and build the dependency graph automatically.
+
+---
+
+## Project Status
+
+**Working Today (v2.0)**
+- ✅ Python code ingestion with symbol extraction
+- ✅ Dependency graph construction
+- ✅ Context CLI with risk assessment
+- ✅ Impact analysis queries
+- ✅ Basic spreading activation
+- ✅ Claude Code integration
+
+**In Progress**
+- 🚧 Multi-language support (TypeScript, Rust, Go parsers defined)
+- 🚧 Advanced consolidation and forgetting cycles
+- 🚧 Improved semantic concept extraction
+- 🚧 Web UI for graph visualization
+
+**Not Promised**
+- ❌ Automatic refactoring (we show you what, not how)
+- ❌ Code generation (we provide context, not features)
+- ❌ Silver bullets for technical debt (we help you understand it, not eliminate it)
+
+**Test Coverage:** 78% (625 statements)
+
+---
+
+## Installation
+
+```bash
+# Clone
+git clone https://github.com/dest92/openpalace.git
+cd openpalace
+
+# Install with Poetry
+poetry install
+
+# Verify
+palace --help
+```
+
+**Requirements:**
+- Python 3.10+
+- ~100MB disk space for databases
+- 2GB RAM minimum (4GB+ recommended for large repos)
+
+---
+
+## Quick Reference
+
+| Command | Purpose |
+|---------|---------|
+| `palace init` | Initialize OpenPalace in current directory |
+| `palace ingest` | Scan and ingest all Python files |
+| `palace ingest -p "src/**/*.py"` | Ingest specific file pattern |
+| `palace context <file>` | Get architectural context for a file |
+| `palace context <file> -c` | One-line compact context |
+| `palace context <file> -o ctx.md` | Save context to file |
+| `palace query "<cypher>"` | Execute raw Cypher query |
+| `palace stats` | Show graph statistics |
+| `palace sleep` | Run consolidation cycle |
+
+---
 
 ## Documentation
 
-Complete documentation available in the [docs/](docs/) directory:
+- **[Quick Start Guide](docs/QUICKSTART.md)** — Get started in 5 minutes
+- **[Tutorial](docs/TUTORIAL.md)** — Complete step-by-step walkthrough
+- **[Demo with Real Code](docs/DEMO.md)** — See actual execution examples
+- **[Claude Integration](docs/CLAUDE.md)** — Use with Claude Code
+- **[API Guide](docs/API_INTEGRATION_GUIDE.md)** — Programmatic usage
+- **[Glossary](docs/GLOSSARY.md)** — Concept definitions
 
-| Document | Description |
-|----------|-------------|
-| **[docs/QUICKSTART.md](docs/QUICKSTART.md)** | 5-minute quick start guide |
-| **[docs/CHEATSHEET.md](docs/CHEATSHEET.md)** | Quick visual reference |
-| **[docs/TUTORIAL.md](docs/TUTORIAL.md)** | Complete step-by-step tutorial |
-| **[docs/GLOSSARY.md](docs/GLOSSARY.md)** | Glossary of all concepts |
-| **[docs/DEMO.md](docs/DEMO.md)** | Real execution examples |
-| **[docs/AGENTS.md](docs/AGENTS.md)** | Integration with AI assistants |
-| **[docs/CLAUDE.md](docs/CLAUDE.md)** | Guide for Claude Code |
-| **[docs/API_INTEGRATION_GUIDE.md](docs/API_INTEGRATION_GUIDE.md)** | API documentation |
-
-See [docs/README.md](docs/README.md) for complete documentation index.
-
-## Development
-
-## Example Output
-
-```bash
-$ poetry run palace context src/auth.py
-## 🏛️ Architectural Context (Palace Mental)
-**Seed**: `src/auth.py` | **Total Activation**: 12.46 | **Risk**: 0.15
-
-### ⚠️ Active Invariants
-• [🔴 CRITICAL] `no_eval` → DO NOT USE eval()
-• [🟠 HIGH] `sql_injection_risk` → Use parameterization
-
-### 🔗 Local Topology (Cognitive Neighborhood)
-**📥 Depends on:**
-- `src/database/connection.py` (python) - dist: 1
-- `src/utils/crypto.py` (python) - dist: 2
-
-**📤 Impacts:**
-- `src/api/routes.py` (python) - dist: 1
-
-### 🧠 Active Concepts
-- **Authentication** `██████████` 1.00
-- **Security** `█████████░` 0.92
-- **Password Management** `███████░░` 0.78
-
-### 🎯 Risk Assessment
-**🟡 Risk Level: Medium (0.15)**
-**Risk factors:**
-- ⚠️ 2 CRITICAL invariants active
-
-**💡 Recommendations:**
-- Carefully review CRITICAL invariants before modifying
-- This file has 3 connections - changes may have domino effects
-```
+---
 
 ## License
 
 MIT
 
-## New Features ✨
+---
 
-### Enhanced CLI
-- **Rich Markdown Output**: Beautiful formatted context with emojis and visual indicators
-- **Compact Mode**: One-line context for quick checks (`--compact`)
-- **Output to File**: Save context for later use (`-o file.md`)
-- **Statistics Command**: View graph statistics (`palace stats`)
-- **Query Command**: Execute raw Cypher queries (`palace query`)
+## Real Questions OpenPalace Can Answer
 
-### Improved Output
-- 🟢🟡🔴 Risk levels with visual indicators
-- 📊 Progress bars for activation energy
-- ⚠️ Categorized invariants by severity
-- 🔗 Topology visualization (depends/impacts/related)
-- 📜 Historical ADR integration
-- 🎯 Risk assessment with recommendations
+**"What files touch the authentication system?"**
+→ Query: All files with path containing "auth" or dependencies on auth modules
 
-### Better AI Integration
-- **ClaudeFormatter**: Optimized Markdown for Claude Code
-- **ContextBundle**: Enriched context structure
-- **AGENTS.md**: Guide for AI assistant integration
-- **Compact prompts**: Perfect for AI workflows
+**"Is this file safe to refactor?"**
+→ Context: Check impact score, number of dependents, active invariants
 
-## Development
+**"Where should I add this new feature?"**
+→ Query: Find files with related concepts, low coupling, and compatible dependencies
+
+**"Why does this test fail after my change?"**
+→ Impact analysis: See what you actually affected, not what you thought you touched
+
+**"How do I give my AI assistant real context?"**
+→ Export: `palace context src/file.py -o context.md` → paste into your AI tool
