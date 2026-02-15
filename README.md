@@ -109,19 +109,24 @@ poetry run palace ingest
 poetry run palace context src/file.py
 ```
 
-See [QUICKSTART.md](QUICKSTART.md) for detailed guide.
+See [docs/QUICKSTART.md](docs/QUICKSTART.md) for detailed guide.
 
 ## Documentation
 
+Complete documentation available in the [docs/](docs/) directory:
+
 | Document | Description |
 |----------|-------------|
-| **[QUICKSTART.md](QUICKSTART.md)** | 5-minute quick start guide |
-| **[CHEATSHEET.md](CHEATSHEET.md)** | Quick visual reference |
-| **[TUTORIAL.md](TUTORIAL.md)** | Complete step-by-step tutorial |
-| **[GLOSSARY.md](GLOSSARY.md)** | Glossary of all concepts |
-| **[DEMO.md](DEMO.md)** | Real execution examples |
-| **[AGENTS.md](AGENTS.md)** | Integration with AI assistants |
-| **[CLAUDE.md](CLAUDE.md)** | Guide for Claude Code |
+| **[docs/QUICKSTART.md](docs/QUICKSTART.md)** | 5-minute quick start guide |
+| **[docs/CHEATSHEET.md](docs/CHEATSHEET.md)** | Quick visual reference |
+| **[docs/TUTORIAL.md](docs/TUTORIAL.md)** | Complete step-by-step tutorial |
+| **[docs/GLOSSARY.md](docs/GLOSSARY.md)** | Glossary of all concepts |
+| **[docs/DEMO.md](docs/DEMO.md)** | Real execution examples |
+| **[docs/AGENTS.md](docs/AGENTS.md)** | Integration with AI assistants |
+| **[docs/CLAUDE.md](docs/CLAUDE.md)** | Guide for Claude Code |
+| **[docs/API_INTEGRATION_GUIDE.md](docs/API_INTEGRATION_GUIDE.md)** | API documentation |
+
+See [docs/README.md](docs/README.md) for complete documentation index.
 
 ## Development
 
