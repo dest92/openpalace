@@ -27,31 +27,47 @@ poetry install
 ### Initialize Repository
 
 ```bash
-palace init
+poetry run palace init
 ```
 
 ### Ingest Code
 
 ```bash
 # Ingest all Python files
-palace ingest
+poetry run palace ingest
 
 # Ingest specific pattern
-palace ingest --file-pattern "src/**/*.py"
+poetry run palace ingest --file-pattern "src/**/*.py"
 ```
 
 ### Get Context
 
 ```bash
-# Get contextual information for a file
-palace context src/auth.py
+# Get full architectural context (rich Markdown)
+poetry run palace context src/auth.py
+
+# Get compact one-line context
+poetry run palace context src/auth.py --compact
+
+# Save context to file
+poetry run palace context src/auth.py -o /tmp/context.md
 ```
 
 ### Run Sleep Cycle
 
 ```bash
 # Run consolidation and pruning
-palace sleep
+poetry run palace sleep
+```
+
+### Statistics and Queries
+
+```bash
+# Show brain statistics
+poetry run palace stats
+
+# Execute raw Cypher query
+poetry run palace query "MATCH (n) RETURN count(n)"
 ```
 
 ## Architecture
@@ -75,45 +91,99 @@ palace sleep
 - **ContextProvider**: Provides contextual information for LLM assistance
 - **CLI Commands**: init, ingest, context, sleep
 
+## Quick Start (5 minutes)
+
+```bash
+# Clone and install
+git clone https://github.com/dest92/openpalace.git
+cd openpalace
+poetry install
+
+# Or use automated setup
+python setup_palace.py
+
+# In your project
+cd /path/to/your/project
+poetry run palace init
+poetry run palace ingest
+poetry run palace context src/file.py
+```
+
+See [QUICKSTART.md](QUICKSTART.md) for detailed guide.
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| **[QUICKSTART.md](QUICKSTART.md)** | 5-minute quick start guide |
+| **[CHEATSHEET.md](CHEATSHEET.md)** | Quick visual reference |
+| **[TUTORIAL.md](TUTORIAL.md)** | Complete step-by-step tutorial |
+| **[GLOSSARY.md](GLOSSARY.md)** | Glossary of all concepts |
+| **[DEMO.md](DEMO.md)** | Real execution examples |
+| **[AGENTS.md](AGENTS.md)** | Integration with AI assistants |
+| **[CLAUDE.md](CLAUDE.md)** | Guide for Claude Code |
+
 ## Development
 
-### Running Tests
+## Example Output
 
 ```bash
-# Run all tests
-pytest
+$ poetry run palace context src/auth.py
+## 🏛️ Architectural Context (Palace Mental)
+**Seed**: `src/auth.py` | **Total Activation**: 12.46 | **Risk**: 0.15
 
-# Run with coverage
-pytest --cov=palace --cov-report=html
-```
+### ⚠️ Active Invariants
+• [🔴 CRITICAL] `no_eval` → DO NOT USE eval()
+• [🟠 HIGH] `sql_injection_risk` → Use parameterization
 
-### Type Checking
+### 🔗 Local Topology (Cognitive Neighborhood)
+**📥 Depends on:**
+- `src/database/connection.py` (python) - dist: 1
+- `src/utils/crypto.py` (python) - dist: 2
 
-```bash
-mypy palace/
-```
+**📤 Impacts:**
+- `src/api/routes.py` (python) - dist: 1
 
-### Code Quality
+### 🧠 Active Concepts
+- **Authentication** `██████████` 1.00
+- **Security** `█████████░` 0.92
+- **Password Management** `███████░░` 0.78
 
-```bash
-# Format code
-black palace/
+### 🎯 Risk Assessment
+**🟡 Risk Level: Medium (0.15)**
+**Risk factors:**
+- ⚠️ 2 CRITICAL invariants active
 
-# Lint code
-ruff check palace/
+**💡 Recommendations:**
+- Carefully review CRITICAL invariants before modifying
+- This file has 3 connections - changes may have domino effects
 ```
 
 ## License
 
 MIT
 
-## Status
+## New Features ✨
 
-**Phase 1**: Foundation (Models & Configuration) ✅
-**Phase 2**: Storage Layer (Hippocampus) ✅
-**Phase 3**: Core Algorithms ✅
-**Phase 4**: Ingestion System ✅
-**Phase 5**: API & CLI ✅
-**Phase 6**: Documentation & Testing (In Progress)
+### Enhanced CLI
+- **Rich Markdown Output**: Beautiful formatted context with emojis and visual indicators
+- **Compact Mode**: One-line context for quick checks (`--compact`)
+- **Output to File**: Save context for later use (`-o file.md`)
+- **Statistics Command**: View graph statistics (`palace stats`)
+- **Query Command**: Execute raw Cypher queries (`palace query`)
 
-Current test coverage: 39 passing tests
+### Improved Output
+- 🟢🟡🔴 Risk levels with visual indicators
+- 📊 Progress bars for activation energy
+- ⚠️ Categorized invariants by severity
+- 🔗 Topology visualization (depends/impacts/related)
+- 📜 Historical ADR integration
+- 🎯 Risk assessment with recommendations
+
+### Better AI Integration
+- **ClaudeFormatter**: Optimized Markdown for Claude Code
+- **ContextBundle**: Enriched context structure
+- **AGENTS.md**: Guide for AI assistant integration
+- **Compact prompts**: Perfect for AI workflows
+
+## Development
