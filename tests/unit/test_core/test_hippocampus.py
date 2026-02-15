@@ -1,5 +1,6 @@
 import pytest
 from pathlib import Path
+import numpy as np
 from palace.core.hippocampus import Hippocampus
 from palace.shared.exceptions import DatabaseError
 
@@ -100,3 +101,25 @@ def test_execute_cypher(temp_palace_dir):
             {}
         )
         assert isinstance(results, list)
+
+def test_store_embedding(temp_palace_dir):
+    """Test storing an embedding."""
+    with Hippocampus(temp_palace_dir) as hippo:
+        hippo.initialize_schema()
+        embedding = np.random.rand(384).astype(np.float32)
+        hippo.store_embedding("node-1", embedding)
+
+def test_similarity_search(temp_palace_dir):
+    """Test similarity search."""
+    with Hippocampus(temp_palace_dir) as hippo:
+        hippo.initialize_schema()
+        # Store some embeddings
+        emb1 = np.random.rand(384).astype(np.float32)
+        emb2 = np.random.rand(384).astype(np.float32)
+        hippo.store_embedding("node-1", emb1)
+        hippo.store_embedding("node-2", emb2)
+
+        # Search
+        results = hippo.similarity_search(emb1, top_k=2)
+        assert len(results) <= 2
+        assert all(isinstance(r, tuple) and len(r) == 2 for r in results)

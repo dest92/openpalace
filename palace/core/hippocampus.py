@@ -289,3 +289,55 @@ class Hippocampus:
         """
         result = self.kuzu_conn.execute(query, params)
         return [dict(row) for row in result]
+
+    def store_embedding(self, node_id: str, embedding: np.ndarray) -> None:
+        """
+        Store an embedding vector.
+
+        Args:
+            node_id: Node ID to associate with embedding
+            embedding: Vector to store (numpy array)
+        """
+        cursor = self.vec_conn.cursor()
+        # Ensure embedding is float32
+        embedding = embedding.astype(np.float32)
+        # sqlite-vec uses a different syntax - store as blob
+        cursor.execute(
+            "INSERT OR REPLACE INTO vec_embeddings(node_id, embedding) VALUES (?, ?)",
+            [node_id, embedding.tobytes()]
+        )
+        self.vec_conn.commit()
+
+    def similarity_search(
+        self,
+        query_embedding: np.ndarray,
+        top_k: int = 10
+    ) -> List[Tuple[str, float]]:
+        """
+        Find similar embeddings by cosine similarity.
+
+        Args:
+            query_embedding: Query vector
+            top_k: Number of results to return
+
+        Returns:
+            List of (node_id, distance) tuples
+        """
+        # For now, just retrieve all embeddings and compute similarity in Python
+        # TODO: Use proper sqlite-vec similarity search
+        cursor = self.vec_conn.cursor()
+        cursor.execute("SELECT node_id, embedding FROM vec_embeddings LIMIT ?", [top_k])
+
+        results = []
+        query_vec = query_embedding.astype(np.float32)
+
+        for row in cursor.fetchall():
+            node_id = row[0]
+            emb_bytes = row[1]
+            # Convert bytes back to numpy array
+            stored_emb = np.frombuffer(emb_bytes, dtype=np.float32)
+            # Compute cosine similarity (1 - cosine distance)
+            similarity = float(np.dot(query_vec, stored_emb) / (np.linalg.norm(query_vec) * np.linalg.norm(stored_emb)))
+            results.append((node_id, 1.0 - similarity))  # Return distance
+
+        return results
