@@ -26,7 +26,8 @@ def init(
 @app.command()
 def ingest(
     repo_root: Path = typer.Argument(".", help="Repository root directory"),
-    file_pattern: str = typer.Option("**/*.py", help="File pattern to ingest")
+    file_pattern: str = typer.Option("**/*.{py,js,jsx,ts,tsx,go}", help="File pattern to ingest"),
+    languages: str = typer.Option(None, "--languages", "-l", help="Comma-separated list of languages to ingest (e.g., python,js,ts)")
 ):
     """Ingest code files into the knowledge graph."""
     palace_dir = repo_root / ".palace"
@@ -43,20 +44,58 @@ def ingest(
         # Find files
         files = list(repo_root.glob(file_pattern))
 
-        typer.echo(f"Found {len(files)} files")
+        typer.echo(f"Found {len(files)} files matching pattern")
+
+        # Filter by language if specified
+        if languages:
+            lang_filter = [lang.strip().lower() for lang in languages.split(',')]
+            filtered_files = []
+            skipped_count = 0
+
+            for file_path in files:
+                detected_lang = pipeline.registry.detect_language(file_path)
+                if detected_lang in lang_filter:
+                    filtered_files.append(file_path)
+                else:
+                    skipped_count += 1
+
+            files = filtered_files
+            if skipped_count > 0:
+                typer.echo(f"Filtered to {len(files)} files (skipped {skipped_count} by language filter)")
+
+        # Get supported extensions for warning messages
+        supported_exts = pipeline.registry.get_supported_extensions()
 
         # Ingest files
+        ingested = 0
+        skipped = 0
+        errors = 0
+
         for file_path in files:
             try:
                 result = pipeline.ingest_file(file_path)
                 if result["status"] == "success":
-                    typer.echo(f"✓ {file_path}: {result['symbols']} symbols")
+                    ingested += 1
+                    typer.echo(f"✓ {file_path}: {result['symbols']} symbols, {result['dependencies']} deps")
                 elif result["status"] == "skipped":
-                    typer.echo(f"- {file_path}: skipped")
+                    skipped += 1
+                    # Check if we should warn about missing parser
+                    if file_path.suffix not in supported_exts:
+                        lang = pipeline.registry.detect_language(file_path)
+                        typer.echo(f"- {file_path}: skipped (no parser for {lang} files)")
+                    else:
+                        typer.echo(f"- {file_path}: skipped")
+                else:
+                    errors += 1
+                    typer.echo(f"✗ {file_path}: {result.get('reason', 'unknown error')}")
             except Exception as e:
+                errors += 1
                 typer.echo(f"✗ {file_path}: {e}")
 
-    typer.echo("Ingestion complete!")
+        typer.echo(f"\nIngestion complete!")
+        typer.echo(f"  ✓ Ingested: {ingested}")
+        typer.echo(f"  - Skipped: {skipped}")
+        typer.echo(f"  ✗ Errors: {errors}")
 
 
 @app.command()
