@@ -263,18 +263,14 @@ class Hippocampus:
         """
         query = "MATCH (n) WHERE n.id = $node_id RETURN n"
         result = self.kuzu_conn.execute(query, {"node_id": node_id})
-        try:
-            row = next(result)
-            # KuzuDB returns results - row[0] contains the node data
-            node_data = row[0]
-            # If it's a list, it contains column values
-            if isinstance(node_data, list):
-                # Get column names from the result
-                columns = result.getColumns()
-                return {col.getName(): node_data[i] for i, col in enumerate(columns)}
-            return node_data
-        except StopIteration:
-            return None
+
+        if result.has_next():
+            row = result.get_next()
+            # In KuzuDB 0.5.0, when returning a node, it comes as a list
+            # with nested structure. We need to handle this properly.
+            if row and len(row) > 0:
+                return row[0] if isinstance(row[0], dict) else {"data": row[0]}
+        return None
 
     def execute_cypher(self, query: str, params: Dict) -> List[Dict]:
         """
@@ -288,10 +284,23 @@ class Hippocampus:
             List of result rows as dicts
         """
         result = self.kuzu_conn.execute(query, params)
-        # Use built-in rows_as_dict method and convert to list
-        if result and result.has_next():
-            return list(result.rows_as_dict())
-        return []
+        rows = []
+
+        if result.has_next():
+            # Get column names before consuming results
+            column_names = result.get_column_names()
+
+            while result.has_next():
+                row = result.get_next()
+                # Convert list to dict using column names
+                if isinstance(row, list) and column_names:
+                    row_dict = dict(zip(column_names, row))
+                    rows.append(row_dict)
+                else:
+                    # Fallback: return as-is
+                    rows.append(row)
+
+        return rows
 
     def store_embedding(self, node_id: str, embedding: np.ndarray) -> None:
         """

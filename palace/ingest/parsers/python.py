@@ -1,29 +1,22 @@
-"""Python language parser using tree-sitter."""
+"""Python language parser using AST/fallback."""
 
 from pathlib import Path
 from typing import List
 import hashlib
+import os
+import ast
+import re
 from palace.ingest.parsers.base import BaseParser, Dependency, Symbol
-
-try:
-    import tree_sitter_python as tspython
-    from tree_sitter import Language, Parser
-    TREE_SITTER_AVAILABLE = True
-except ImportError:
-    TREE_SITTER_AVAILABLE = False
 
 
 class PythonParser(BaseParser):
     """Parser for Python source code."""
 
     def __init__(self):
-        """Initialize parser with tree-sitter."""
-        if not TREE_SITTER_AVAILABLE:
-            raise ImportError("tree-sitter-python not installed")
-
-        # New tree-sitter API requires library_path and name
-        self.language = Language(tspython.language_path(), "python")
-        self.parser = Parser(self.language)
+        """Initialize parser."""
+        # Use Python's built-in AST module instead of tree-sitter
+        # due to compatibility issues with tree-sitter 0.20+ in Python 3.12
+        pass
 
     def supported_extensions(self) -> List[str]:
         """Return supported file extensions."""
@@ -34,85 +27,78 @@ class PythonParser(BaseParser):
         file_path: Path,
         content: str
     ) -> List[Dependency]:
-        """Extract import statements."""
-        tree = self.parser.parse(bytes(content, "utf-8"))
+        """Extract import statements using AST."""
         deps = []
 
-        def find_imports(node):
-            if node.type == "import_statement":
-                # Handle: import os
-                for child in node.children:
-                    if child.type == "dotted_name" or child.type == "name":
+        try:
+            tree = ast.parse(content)
+
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    for alias in node.names:
                         deps.append(Dependency(
-                            path=child.text.decode(),
+                            path=alias.name,
                             type="IMPORT",
-                            lineno=node.start_point[0] + 1
+                            lineno=node.lineno
                         ))
-                        break
-            elif node.type == "import_from_statement":
-                # Handle: from typing import List
-                module_node = node.child_by_field_name("module_name")
-                if module_node:
+                elif isinstance(node, ast.ImportFrom):
+                    module = node.module or ""
+                    for alias in node.names:
+                        deps.append(Dependency(
+                            path=f"{module}.{alias.name}" if module else alias.name,
+                            type="IMPORT",
+                            lineno=node.lineno
+                        ))
+        except SyntaxError:
+            # Fallback to regex if AST parsing fails
+            import_pattern = r'^\s*(?:import|from)\s+([^\n]+)'
+            for lineno, line in enumerate(content.split('\n'), 1):
+                match = re.match(import_pattern, line)
+                if match:
                     deps.append(Dependency(
-                        path=module_node.text.decode(),
+                        path=match.group(1).split(' as ')[0].split(',')[0],
                         type="IMPORT",
-                        lineno=node.start_point[0] + 1
+                        lineno=lineno
                     ))
 
-            for child in node.children:
-                find_imports(child)
-
-        find_imports(tree.root_node)
         return deps
 
     def extract_symbols(self, content: str) -> List[Symbol]:
-        """Extract functions, classes, constants."""
-        tree = self.parser.parse(bytes(content, "utf-8"))
+        """Extract functions, classes, constants using AST."""
         symbols = []
 
-        def find_symbols(node):
-            if node.type == "function_definition":
-                name_node = node.child_by_field_name("name")
-                symbols.append(Symbol(
-                    name=name_node.text.decode() if name_node else "",
-                    type="function",
-                    lineno=node.start_point[0] + 1,
-                    docstring=self._extract_docstring(node)
-                ))
-            elif node.type == "class_definition":
-                name_node = node.child_by_field_name("name")
-                symbols.append(Symbol(
-                    name=name_node.text.decode() if name_node else "",
-                    type="class",
-                    lineno=node.start_point[0] + 1,
-                    docstring=self._extract_docstring(node)
-                ))
+        try:
+            tree = ast.parse(content)
 
-            for child in node.children:
-                find_symbols(child)
+            for node in ast.walk(tree):
+                if isinstance(node, ast.FunctionDef):
+                    docstring = ast.get_docstring(node) or ""
+                    symbols.append(Symbol(
+                        name=node.name,
+                        type="function",
+                        lineno=node.lineno,
+                        docstring=docstring
+                    ))
+                elif isinstance(node, ast.ClassDef):
+                    docstring = ast.get_docstring(node) or ""
+                    symbols.append(Symbol(
+                        name=node.name,
+                        type="class",
+                        lineno=node.lineno,
+                        docstring=docstring
+                    ))
+        except SyntaxError:
+            pass  # Return empty list if syntax error
 
-        find_symbols(tree.root_node)
         return symbols
 
     def compute_fingerprint(self, content: str) -> str:
         """Compute hash of AST structure."""
-        tree = self.parser.parse(bytes(content, "utf-8"))
-
-        # Serialize structure
-        structure = self._serialize_node(tree.root_node)
-        return hashlib.sha256(structure.encode()).hexdigest()
-
-    def _extract_docstring(self, node) -> str:
-        """Extract docstring from function/class node."""
-        # Find first string expression child
-        for child in node.children:
-            if child.type == "string":
-                return child.text.decode().strip('"\'')
-        return ""
-
-    def _serialize_node(self, node, indent=0) -> str:
-        """Serialize tree structure to string."""
-        result = "  " * indent + node.type + "\n"
-        for child in node.children:
-            result += self._serialize_node(child, indent + 1)
-        return result
+        try:
+            tree = ast.parse(content)
+            # Serialize AST structure
+            structure = ast.dump(tree)
+            return hashlib.sha256(structure.encode()).hexdigest()
+        except SyntaxError:
+            # Fallback to hash of content if AST parsing fails
+            return hashlib.sha256(content.encode()).hexdigest()
