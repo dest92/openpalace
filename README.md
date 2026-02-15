@@ -37,9 +37,12 @@ OpenPalace ingests your code and builds a knowledge graph that persists between 
 4. **AI integration** — Export structured context that LLMs can use to give better answers
 
 **What it works with:**
-- Python code today (more languages in progress)
+- Python, JavaScript, TypeScript, Go (more languages coming)
+- Framework-specific: Next.js route detection and metadata extraction
 - Local-only, runs on your machine
 - Works offline after initial setup
+
+📖 **See [MULTI_LANG.md](docs/MULTI_LANG.md) for complete multi-language documentation**
 
 ---
 
@@ -56,7 +59,15 @@ cd /path/to/your-project
 
 # Initialize and ingest
 palace init
-palace ingest --file-pattern "src/**/*.py"
+
+# Python-only project
+palace ingest --languages python
+
+# Multi-language project (Python, JavaScript, TypeScript, Go)
+palace ingest
+
+# Or specify custom patterns
+palace ingest "**/*.{py,ts,tsx}"
 ```
 
 Now ask questions your editor can't answer:

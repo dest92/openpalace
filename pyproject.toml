@@ -12,16 +12,26 @@ kuzu = "^0.5.0"
 sqlite-vec = "^0.1.0"
 sentence-transformers = "^2.2.0"
 tree-sitter = "^0.20.0"
-tree-sitter-python = "^0.20.0"
-tree-sitter-typescript = "^0.20.0"
-tree-sitter-rust = "^0.20.0"
-tree-sitter-go = "^0.20.0"  # Allow newer versions
 numpy = "^1.24.0"
 typer = {extras = ["standard"], version = "^0.12.0"}
 pydantic = "^2.0.0"
 pydantic-settings = "^2.0.0"
 tenacity = "^8.2.0"
 python-dotenv = "^1.0.0"
+
+# Optional language-specific parsers
+tree-sitter-python = {version = "^0.20.0", optional = true}
+tree-sitter-javascript = {version = "^0.20.0", optional = true}
+tree-sitter-typescript = {version = "^0.20.0", optional = true}
+tree-sitter-go = {version = "^0.20.0", optional = true}
+tree-sitter-rust = {version = "^0.20.0", optional = true}
+
+[tool.poetry.extras]
+javascript = ["tree-sitter-javascript"]
+typescript = ["tree-sitter-typescript"]
+go = ["tree-sitter-go"]
+rust = ["tree-sitter-rust"]
+all-languages = ["tree-sitter-javascript", "tree-sitter-typescript", "tree-sitter-go", "tree-sitter-rust"]
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.4.0"

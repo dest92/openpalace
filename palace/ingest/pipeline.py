@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import List, Optional
 from palace.core.hippocampus import Hippocampus
 from palace.ingest.parsers.base import BaseParser
-from palace.ingest.parsers.python import PythonParser
+from palace.ingest.parsers.registry import ParserRegistry
 from palace.ingest.extractors import ConceptExtractor
 from palace.ingest.invariants import InvariantDetector
 from palace.shared.models import Artifact, Concept
@@ -25,7 +25,7 @@ class BigBangPipeline:
         self.hippocampus = hippocampus
         self.concept_extractor = concept_extractor
         self.invariant_detector = InvariantDetector()
-        self.parsers: List[BaseParser] = [PythonParser()]
+        self.registry = ParserRegistry.instance()
 
     def ingest_file(self, file_path: Path) -> dict:
         """
@@ -113,17 +113,9 @@ class BigBangPipeline:
         }
 
     def _find_parser(self, file_path: Path) -> Optional[BaseParser]:
-        """Find appropriate parser for file."""
-        for parser in self.parsers:
-            if file_path.suffix in parser.supported_extensions():
-                return parser
-        return None
+        """Find appropriate parser for file using registry."""
+        return self.registry.get_parser(file_path)
 
     def _get_language(self, file_path: Path) -> str:
-        """Get language name from file extension."""
-        ext = file_path.suffix
-        lang_map = {
-            ".py": "python",
-            ".pyx": "python",
-        }
-        return lang_map.get(ext, "unknown")
+        """Get language name from file extension using registry."""
+        return self.registry.detect_language(file_path)
