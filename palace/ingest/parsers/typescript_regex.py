@@ -71,7 +71,7 @@ class TypeScriptRegexParser(BaseParser):
         class_pattern = r'^\s*(?:export\s+)?(?:abstract\s+)?class\s+(\w+)'
 
         # Function declarations: function name() {}
-        func_pattern = r'^\s*(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*\('
+        func_pattern = r'^\s*(?:export\s+)?(?:export\s+default\s+)?(?:async\s+)?function\s+(\w+)\s*\('
 
         # Const declarations: const NAME: type = ...
         const_pattern = r'^\s*(?:export\s+)?const\s+(\w+)\s*:'
