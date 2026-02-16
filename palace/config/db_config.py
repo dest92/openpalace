@@ -1,26 +1,28 @@
 """Optimal database configuration settings for Palace Mental."""
 
 # KuzuDB optimal configuration
+# Based on KuzuDB 0.11.3 Database() parameters
 KUZU_OPTIMAL_CONFIG = {
-    # Buffer sizes for large datasets
-    'kuzu_node_buffer_size': 1073741824,  # 1GB
-    'kuzu_relationship_buffer_size': 536870912,  # 512MB
+    # Buffer pool size in bytes (default: ~80% of system memory)
+    # 1GB buffer pool for large datasets
+    'buffer_pool_size': 1073741824,
 
-    # Parallelism settings
-    'kuzu_max_num_threads': 8,
-    'kuzu_enable_auto_flush': True,
+    # Maximum number of threads for query execution
+    # Set to number of CPU cores for optimal parallelism
+    'max_num_threads': 8,
 
-    # Memory management
-    'kuzu_buffer_pool_size': 2097152,  # 2MB
-    'kuzu_max_db_size': 10737418240,  # 10GB
+    # Maximum database size in bytes (default: 8TB)
+    # 10GB limit for controlled growth
+    'max_db_size': 10737418240,  # 10GB
 
-    # Query optimization
-    'kuzu_enable_journaling': True,
-    'kuzu_checkpoint_interval': 60000,  # 60 seconds
+    # Enable database compression (default: True)
+    'compression': True,
 
-    # Indexing
-    'kuzu_auto_index': True,
-    'kuzu_index_memory_limit': 2147483648,  # 2GB
+    # Auto checkpoint after writes (default: True)
+    'auto_checkpoint': True,
+
+    # Checkpoint threshold in bytes (-1 = use default)
+    'checkpoint_threshold': -1,
 }
 
 # SQLite+vec optimal configuration
@@ -72,11 +74,8 @@ PERFORMANCE_CONFIG = {
 
 
 def get_kuzu_config() -> dict:
-    """Get KuzuDB configuration as list of SET statements."""
-    return [
-        f"SET {key} = {value}"
-        for key, value in KUZU_OPTIMAL_CONFIG.items()
-    ]
+    """Get KuzuDB configuration as dict for Database() constructor."""
+    return KUZU_OPTIMAL_CONFIG.copy()
 
 
 def get_sqlite_pragmas() -> list:

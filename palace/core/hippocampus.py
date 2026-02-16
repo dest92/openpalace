@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Literal
 import numpy as np
 from palace.core.compression import EmbeddingCompressor
+from palace.config.db_config import get_kuzu_config
 
 
 class Hippocampus:
@@ -25,9 +26,10 @@ class Hippocampus:
         self.palace_dir = Path(palace_dir)
         self.palace_dir.mkdir(parents=True, exist_ok=True)
 
-        # Initialize KuzuDB
+        # Initialize KuzuDB with optimal configuration
         self.db_path = self.palace_dir / "brain.kuzu"
-        self.kuzu_db = kuzu.Database(str(self.db_path))
+        kuzu_config = get_kuzu_config()
+        self.kuzu_db = kuzu.Database(str(self.db_path), **kuzu_config)
         self.kuzu_conn = kuzu.Connection(self.kuzu_db)
 
         # Initialize SQLite+vec
