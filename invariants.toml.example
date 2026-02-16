@@ -1,0 +1,53 @@
+# Palace Mental Invariant Configuration
+# Copy this file to .palace/invariants.toml to customize
+
+[rules.hardcoded_secrets]
+enabled = true
+severity = "CRITICAL"
+# Additional regex patterns to detect secrets
+patterns = [
+    'password\\s*=\\s*["\'][^"\']{8,}["\']',
+    'api_key\\s*=\\s*["\'][^"\']{20,}["\']',
+]
+
+[rules.eval_usage]
+enabled = true
+severity = "CRITICAL"
+
+[rules.sql_injection]
+enabled = true
+severity = "CRITICAL"
+
+[rules.unparameterized_sql]
+enabled = true
+severity = "HIGH"
+
+[rules.long_function]
+enabled = true
+severity = "MEDIUM"
+# Maximum number of lines per function
+threshold = 50
+
+[rules.missing_type_hints]
+enabled = true
+severity = "LOW"
+
+[rules.god_object]
+enabled = true
+severity = "MEDIUM"
+# Maximum number of methods per class
+threshold = 10
+
+[rules.missing_error_handling]
+enabled = true
+severity = "MEDIUM"
+# Additional patterns to detect risky operations
+patterns = [
+    '\\.open\\s*\\(',
+    '\\.read\\s*\\(',
+    '\\.write\\s*\\(',
+]
+
+[rules.circular_import]
+enabled = true
+severity = "HIGH"

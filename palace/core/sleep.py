@@ -11,6 +11,7 @@ from palace.core.hippocampus import Hippocampus
 @dataclass
 class SleepReport:
     """Report from a sleep cycle."""
+
     nodes_count: int
     edges_count: int
     edges_decayed: int
@@ -38,7 +39,7 @@ class SleepEngine:
         self,
         lambda_decay: float = 0.05,
         prune_threshold: float = 0.1,
-        detect_communities: bool = True
+        detect_communities: bool = True,
     ) -> SleepReport:
         """
         Execute full sleep cycle.
@@ -76,79 +77,58 @@ class SleepEngine:
             edges_decayed=edges_decayed,
             edges_pruned=edges_pruned,
             communities_detected=communities_detected,
-            total_duration_ms=duration_ms
+            total_duration_ms=duration_ms,
         )
 
     def _count_nodes(self) -> int:
         """Count total nodes in graph."""
-        result = self.hippocampus.execute_cypher(
-            "MATCH (n) RETURN count(n) AS count",
-            {}
-        )
+        result = self.hippocampus.execute_cypher("MATCH (n) RETURN count(n) AS count", {})
         return int(result[0]["count"]) if result else 0
 
     def _count_edges(self) -> int:
         """Count total edges in graph."""
-        result = self.hippocampus.execute_cypher(
-            "MATCH ()-[r]->() RETURN count(r) AS count",
-            {}
-        )
+        result = self.hippocampus.execute_cypher("MATCH ()-[r]->() RETURN count(r) AS count", {})
         return int(result[0]["count"]) if result else 0
 
     def _decay_edge_weights(self, lambda_decay: float) -> int:
         """
         Apply exponential decay: w = w * exp(-λ * Δt)
 
-        Note: For this implementation, we decay all edges uniformly.
-        A more sophisticated version would use last_activated timestamps.
+        Optimized: Uses single Cypher query with batch update.
 
         Returns:
             Number of edges decayed
         """
-        # Get all RELATED_TO edges (Concept-to-Concept)
+        # Single batch query to decay all edges at once
         query = """
             MATCH (a)-[r:RELATED_TO]->(b)
-            RETURN a.id AS src, b.id AS dst, r.weight AS weight
+            WHERE r.weight IS NOT NULL AND r.weight > 0
+            SET r.weight = r.weight * (1.0 - $decay_rate)
+            RETURN count(r) AS decayed
         """
-        edges = self.hippocampus.execute_cypher(query, {})
 
-        decayed_count = 0
-
-        for edge in edges:
-            # Apply decay based on lambda_decay
-            # For simplicity, we decay by lambda_decay rate
-            new_weight = edge["weight"] * (1.0 - lambda_decay)
-
-            if new_weight < edge["weight"] and new_weight > 0:
-                self._update_edge_weight(
-                    edge["src"], edge["dst"], "RELATED_TO", new_weight
-                )
-                decayed_count += 1
-
-        return decayed_count
+        result = self.hippocampus.execute_cypher(query, {"decay_rate": lambda_decay})
+        return int(result[0]["decayed"]) if result else 0
 
     def _prune_weak_edges(self, threshold: float) -> int:
         """
         Remove edges with weight < threshold.
 
+        Optimized: Uses single Cypher query with batch delete.
+
         Returns:
             Number of edges pruned
         """
-        # Get all RELATED_TO edges with weight
+        # Single batch query to prune all weak edges at once
         query = """
             MATCH (a)-[r:RELATED_TO]->(b)
-            RETURN a.id AS src, b.id AS dst, r.weight AS weight
+            WHERE r.weight IS NOT NULL AND r.weight < $threshold
+            DELETE r
+            RETURN count(r) AS pruned
         """
-        edges = self.hippocampus.execute_cypher(query, {})
 
-        pruned_count = 0
-
-        for edge in edges:
-            if edge["weight"] < threshold:
-                self._remove_edge(edge["src"], edge["dst"], "RELATED_TO")
-                pruned_count += 1
-
-        return pruned_count
+        result = self.hippocampus.execute_cypher(query, {"threshold": threshold})
+        return int(result[0]["pruned"]) if result else 0
 
     def _detect_communities(self) -> int:
         """
@@ -162,24 +142,14 @@ class SleepEngine:
         # For now, return 0 as placeholder
         return 0
 
-    def _update_edge_weight(
-        self,
-        src: str,
-        dst: str,
-        edge_type: str,
-        weight: float
-    ) -> None:
+    def _update_edge_weight(self, src: str, dst: str, edge_type: str, weight: float) -> None:
         """Update edge weight."""
         query = f"""
             MATCH (a)-[r:{edge_type}]->(b)
             WHERE a.id = $src AND b.id = $dst
             SET r.weight = $weight
         """
-        self.hippocampus.execute_cypher(query, {
-            "src": src,
-            "dst": dst,
-            "weight": weight
-        })
+        self.hippocampus.execute_cypher(query, {"src": src, "dst": dst, "weight": weight})
 
     def _remove_edge(self, src: str, dst: str, edge_type: str) -> None:
         """Remove edge between nodes."""
