@@ -102,7 +102,7 @@ class Hippocampus:
                 created_at TIMESTAMP,
                 PRIMARY KEY (id)
             )
-            """,
+            """
         ]
 
         for node_type in node_types:
@@ -145,7 +145,7 @@ class Hippocampus:
                 FROM Concept TO Concept,
                 weight DOUBLE
             )
-            """,
+            """
         ]
 
         for edge_type in edge_types:
@@ -228,7 +228,13 @@ class Hippocampus:
         self.kuzu_conn.execute(query, properties)
         return properties["id"]
 
-    def create_edge(self, src_id: str, dst_id: str, edge_type: str, properties: Dict) -> None:
+    def create_edge(
+        self,
+        src_id: str,
+        dst_id: str,
+        edge_type: str,
+        properties: Dict
+    ) -> None:
         """
         Create an edge between two nodes.
 
@@ -248,14 +254,21 @@ class Hippocampus:
                 CREATE (src)-[r:{edge_type} {{prop_list}}]->(dst)
             """
             query = query.replace("{prop_list}", "{" + prop_list + "}")
-            params = {"src_id": src_id, "dst_id": dst_id, **properties}
+            params = {
+                "src_id": src_id,
+                "dst_id": dst_id,
+                **properties
+            }
         else:
             query = f"""
                 MATCH (src), (dst)
                 WHERE src.id = $src_id AND dst.id = $dst_id
                 CREATE (src)-[r:{edge_type}]->(dst)
             """
-            params = {"src_id": src_id, "dst_id": dst_id}
+            params = {
+                "src_id": src_id,
+                "dst_id": dst_id
+            }
         self.kuzu_conn.execute(query, params)
 
     def get_node(self, node_id: str) -> Optional[Dict]:
@@ -323,16 +336,17 @@ class Hippocampus:
         # sqlite-vec uses a different syntax - store as blob
         cursor.execute(
             "INSERT OR REPLACE INTO vec_embeddings(node_id, embedding) VALUES (?, ?)",
-            [node_id, embedding.tobytes()],
+            [node_id, embedding.tobytes()]
         )
         self.vec_conn.commit()
 
     def similarity_search(
-        self, query_embedding: np.ndarray, top_k: int = 10
+        self,
+        query_embedding: np.ndarray,
+        top_k: int = 10
     ) -> List[Tuple[str, float]]:
         """
-        Find similar embeddings using sqlite-vec native KNN search.
-        Much faster than Python-based similarity computation.
+        Find similar embeddings by cosine similarity.
 
         Args:
             query_embedding: Query vector
@@ -341,208 +355,21 @@ class Hippocampus:
         Returns:
             List of (node_id, distance) tuples
         """
+        # For now, just retrieve all embeddings and compute similarity in Python
+        # TODO: Use proper sqlite-vec similarity search
         cursor = self.vec_conn.cursor()
-        # Use sqlite-vec's native vector search with MATCH operator
-        # This uses the underlying vec0 virtual table index for O(log n) search
-        query_bytes = query_embedding.astype(np.float32).tobytes()
+        cursor.execute("SELECT node_id, embedding FROM vec_embeddings LIMIT ?", [top_k])
 
-        try:
-            cursor.execute(
-                """
-                SELECT node_id, distance
-                FROM vec_embeddings
-                WHERE embedding MATCH ?
-                ORDER BY distance
-                LIMIT ?
-            """,
-                [query_bytes, top_k],
-            )
-            return [(row[0], row[1]) for row in cursor.fetchall()]
-        except Exception:
-            # Fallback to Python computation if MATCH not supported
-            cursor.execute("SELECT node_id, embedding FROM vec_embeddings")
-            results = []
-            query_vec = query_embedding.astype(np.float32)
+        results = []
+        query_vec = query_embedding.astype(np.float32)
 
-            for row in cursor.fetchall():
-                node_id = row[0]
-                emb_bytes = row[1]
-                stored_emb = np.frombuffer(emb_bytes, dtype=np.float32)
-                similarity = float(
-                    np.dot(query_vec, stored_emb)
-                    / (np.linalg.norm(query_vec) * np.linalg.norm(stored_emb))
-                )
-                results.append((node_id, 1.0 - similarity))
+        for row in cursor.fetchall():
+            node_id = row[0]
+            emb_bytes = row[1]
+            # Convert bytes back to numpy array
+            stored_emb = np.frombuffer(emb_bytes, dtype=np.float32)
+            # Compute cosine similarity (1 - cosine distance)
+            similarity = float(np.dot(query_vec, stored_emb) / (np.linalg.norm(query_vec) * np.linalg.norm(stored_emb)))
+            results.append((node_id, 1.0 - similarity))  # Return distance
 
-            results.sort(key=lambda x: x[1])
-            return results[:top_k]
-
-    def create_nodes_batch(self, node_type: str, nodes: List[Dict]) -> List[str]:
-        """
-        Create multiple nodes in batch for better performance.
-
-        Args:
-            node_type: Type of node (Concept, Artifact, etc.)
-            nodes: List of node property dictionaries
-
-        Returns:
-            List of created node IDs
-        """
-        if not nodes:
-            return []
-
-        node_ids = []
-        for node in nodes:
-            try:
-                self.create_node(node_type, node)
-                node_ids.append(node.get("id"))
-            except Exception:
-                # Node might already exist, skip
-                pass
-
-        return node_ids
-
-    def create_edges_batch(self, edges: List[Dict]) -> int:
-        """
-        Create multiple edges in batch.
-
-        Args:
-            edges: List of edge dictionaries with keys:
-                   src_id, dst_id, edge_type, properties
-
-        Returns:
-            Number of edges created
-        """
-        if not edges:
-            return 0
-
-        count = 0
-        for edge in edges:
-            try:
-                self.create_edge(
-                    edge["src_id"], edge["dst_id"], edge["edge_type"], edge.get("properties", {})
-                )
-                count += 1
-            except Exception:
-                # Edge might already exist, skip
-                pass
-
-        return count
-
-    def store_embeddings_batch(self, embeddings: List[Tuple[str, np.ndarray]]) -> None:
-        """
-        Store multiple embeddings in a single transaction for better performance.
-
-        Args:
-            embeddings: List of (node_id, embedding) tuples
-        """
-        if not embeddings:
-            return
-
-        cursor = self.vec_conn.cursor()
-        data = [(node_id, emb.astype(np.float32).tobytes()) for node_id, emb in embeddings]
-
-        cursor.executemany(
-            "INSERT OR REPLACE INTO vec_embeddings(node_id, embedding) VALUES (?, ?)", data
-        )
-        self.vec_conn.commit()
-
-    def store_embedding_compressed(
-        self,
-        node_id: str,
-        embedding: np.ndarray,
-        compression: Literal["float32", "int8", "binary"] = "int8",
-    ) -> None:
-        """
-        Store embedding with compression for reduced storage size.
-
-        Args:
-            node_id: Node ID to associate with embedding
-            embedding: Vector to store (numpy array)
-            compression: Compression method - "float32" (none), "int8" (4x), or "binary" (32x)
-        """
-        if compression == "float32":
-            # No compression, use regular storage
-            self.store_embedding(node_id, embedding)
-            return
-
-        cursor = self.vec_conn.cursor()
-
-        # Compress embedding
-        compressed_bytes, metadata = EmbeddingCompressor.compress(embedding, compression)
-
-        # Store in a separate table for compressed embeddings
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS compressed_embeddings (
-                node_id TEXT PRIMARY KEY,
-                embedding BLOB,
-                method TEXT,
-                dims INTEGER,
-                min_val REAL,
-                max_val REAL
-            )
-        """)
-
-        if compression == "int8":
-            cursor.execute(
-                """
-                INSERT OR REPLACE INTO compressed_embeddings
-                (node_id, embedding, method, dims, min_val, max_val)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """,
-                [
-                    node_id,
-                    compressed_bytes,
-                    metadata["method"],
-                    metadata["dims"],
-                    metadata["min"],
-                    metadata["max"],
-                ],
-            )
-        else:  # binary
-            cursor.execute(
-                """
-                INSERT OR REPLACE INTO compressed_embeddings
-                (node_id, embedding, method, dims)
-                VALUES (?, ?, ?, ?)
-            """,
-                [node_id, compressed_bytes, metadata["method"], metadata["dims"]],
-            )
-
-        self.vec_conn.commit()
-
-    def load_embedding_compressed(self, node_id: str) -> Optional[np.ndarray]:
-        """
-        Load and decompress an embedding.
-
-        Args:
-            node_id: Node ID to retrieve
-
-        Returns:
-            Decompressed embedding or None if not found
-        """
-        cursor = self.vec_conn.cursor()
-
-        # First check compressed table
-        cursor.execute(
-            """
-            SELECT embedding, method, dims, min_val, max_val
-            FROM compressed_embeddings
-            WHERE node_id = ?
-        """,
-            [node_id],
-        )
-
-        row = cursor.fetchone()
-        if row:
-            compressed, method, dims, min_val, max_val = row
-            metadata = {"method": method, "dims": dims, "min": min_val, "max": max_val}
-            return EmbeddingCompressor.decompress(compressed, metadata)
-
-        # Fall back to regular vec_embeddings table
-        cursor.execute("SELECT embedding FROM vec_embeddings WHERE node_id = ?", [node_id])
-        row = cursor.fetchone()
-        if row:
-            return np.frombuffer(row[0], dtype=np.float32)
-
-        return None
+        return results
