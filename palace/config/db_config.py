@@ -12,8 +12,9 @@ KUZU_OPTIMAL_CONFIG = {
     'max_num_threads': 8,
 
     # Maximum database size in bytes (default: 8TB)
-    # 10GB limit for controlled growth
-    'max_db_size': 10737418240,  # 10GB
+    # MUST be a power of 2 for KuzuDB 0.11.3+
+    # 16GB limit for controlled growth
+    'max_db_size': 17179869184,  # 16GB (2^34)
 
     # Enable database compression (default: True)
     'compression': True,

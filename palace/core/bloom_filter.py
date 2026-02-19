@@ -61,8 +61,9 @@ class CompressedBloomFilter:
         # Generate hash seeds if not provided
         if hash_seeds is None:
             # Use deterministic seeds based on configuration
+            # Take only first 8 hex chars (32 bits) to fit in mmh3 seed range
             self.hash_seeds = [
-                int(hashlib.sha256(f"bloom{i}".encode()).hexdigest(), 16)
+                int(hashlib.sha256(f"bloom{i}".encode()).hexdigest()[:8], 16)
                 for i in range(self.num_hashes)
             ]
         else:
