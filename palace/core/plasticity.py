@@ -19,11 +19,7 @@ class PlasticityEngine:
         """
         self.hippocampus = hippocampus
 
-    def reinforce_coactivation(
-        self,
-        node_set: Set[str],
-        learning_rate: float = 0.1
-    ) -> None:
+    def reinforce_coactivation(self, node_set: Set[str], learning_rate: float = 0.1) -> None:
         """
         Strengthen connections between all pairs in node_set.
 
@@ -46,12 +42,7 @@ class PlasticityEngine:
                 # Update or create edge
                 self._set_edge_weight(node_a, node_b, "RELATED_TO", new_weight)
 
-    def punish_mistake(
-        self,
-        node_a: str,
-        node_b: str,
-        penalty: float = 0.2
-    ) -> None:
+    def punish_mistake(self, node_a: str, node_b: str, penalty: float = 0.2) -> None:
         """
         Weaken connection between two nodes after bad outcome.
 
@@ -71,12 +62,7 @@ class PlasticityEngine:
             else:
                 self._set_edge_weight(node_a, node_b, "RELATED_TO", new_weight)
 
-    def get_edge_weight(
-        self,
-        src: str,
-        dst: str,
-        edge_type: str
-    ) -> float:
+    def get_edge_weight(self, src: str, dst: str, edge_type: str) -> float:
         """
         Get current edge weight or return 0.0 if no edge.
 
@@ -94,23 +80,14 @@ class PlasticityEngine:
             WHERE a.id = $src AND b.id = $dst
             RETURN r.weight AS weight
         """
-        result = self.hippocampus.execute_cypher(query, {
-            "src": src,
-            "dst": dst
-        })
+        result = self.hippocampus.execute_cypher(query, {"src": src, "dst": dst})
 
         if result:
             weight = result[0].get("weight")
             return float(weight) if weight is not None else 0.0
         return 0.0
 
-    def _set_edge_weight(
-        self,
-        src: str,
-        dst: str,
-        edge_type: str,
-        weight: float
-    ) -> None:
+    def _set_edge_weight(self, src: str, dst: str, edge_type: str, weight: float) -> None:
         """Create or update edge with weight."""
         # First check if edge exists
         query_check = f"""
@@ -118,10 +95,7 @@ class PlasticityEngine:
             WHERE a.id = $src AND b.id = $dst
             RETURN r
         """
-        existing = self.hippocampus.execute_cypher(query_check, {
-            "src": src,
-            "dst": dst
-        })
+        existing = self.hippocampus.execute_cypher(query_check, {"src": src, "dst": dst})
 
         if existing:
             # Update existing edge
@@ -130,11 +104,9 @@ class PlasticityEngine:
                 WHERE a.id = $src AND b.id = $dst
                 SET r.weight = $weight
             """
-            self.hippocampus.execute_cypher(query_update, {
-                "src": src,
-                "dst": dst,
-                "weight": weight
-            })
+            self.hippocampus.execute_cypher(
+                query_update, {"src": src, "dst": dst, "weight": weight}
+            )
         else:
             # Create new edge
             self.hippocampus.create_edge(src, dst, edge_type, {"weight": weight})
