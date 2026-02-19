@@ -1,24 +1,25 @@
-"""Hippocampus - Main interface to graph and vector databases."""
+"""Hippocampus V2 - Pure graph storage (NO embeddings)."""
 
 import kuzu
-import sqlite3
-import sqlite_vec
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Literal
-import numpy as np
-from palace.core.compression import EmbeddingCompressor
+from typing import Dict, List, Optional
 from palace.config.db_config import get_kuzu_config
 
 
 class Hippocampus:
     """
-    Main interface to KuzuDB and SQLite+vec.
-    Manages graph schema, node/edge CRUD, and vector operations.
+    Palace Mental V2: Pure graph database interface.
+
+    Changes from V1:
+    - REMOVED: SQLite+vec (embeddings storage)
+    - REMOVED: All vector operations
+    - KEPT: KuzuDB for graph relationships only
+    - OPTIMIZED: Minimal storage (~200MB for 10M artifacts)
     """
 
     def __init__(self, palace_dir: Path):
         """
-        Initialize both databases.
+        Initialize KuzuDB database (NO vector DB).
 
         Args:
             palace_dir: Directory containing .palace/ data
@@ -32,31 +33,29 @@ class Hippocampus:
         self.kuzu_db = kuzu.Database(str(self.db_path), **kuzu_config)
         self.kuzu_conn = kuzu.Connection(self.kuzu_db)
 
-        # Initialize SQLite+vec
-        self.vec_db_path = self.palace_dir / "vectors.db"
-        self.vec_conn = sqlite3.connect(str(self.vec_db_path))
-        self.vec_conn.enable_load_extension(True)
-        sqlite_vec.load(self.vec_conn)
-        self.vec_conn.enable_load_extension(False)
-
     def is_connected(self) -> bool:
-        """Check if databases are connected."""
-        return self.kuzu_conn is not None and self.vec_conn is not None
+        """Check if database is connected."""
+        return self.kuzu_conn is not None
 
     def initialize_schema(self) -> None:
-        """Create all node types, edge types, and vector tables."""
+        """Create all node and edge types."""
         self._create_kuzu_schema()
-        self._create_vector_schema()
 
     def _create_kuzu_schema(self) -> None:
-        """Create KuzuDB node and edge types."""
+        """
+        Create KuzuDB node and edge types.
+
+        Simplified V2 schema:
+        - NO embedding_id in Concept
+        - NO vector-related fields
+        - Pure graph relationships only
+        """
         # Node types
         node_types = [
             """
             CREATE NODE TABLE Concept (
                 id STRING,
                 name STRING,
-                embedding_id STRING,
                 layer STRING,
                 stability FLOAT,
                 created_at TIMESTAMP,
@@ -157,52 +156,14 @@ class Hippocampus:
                 # Edge type might already exist
                 pass
 
-    def _create_vector_schema(self) -> None:
-        """Create SQLite+vec tables for embeddings."""
-        cursor = self.vec_conn.cursor()
-
-        # Create embeddings table
-        cursor.execute("""
-            CREATE VIRTUAL TABLE IF NOT EXISTS vec_embeddings
-            USING vec0(
-                node_id TEXT PRIMARY KEY,
-                embedding FLOAT[384]
-            )
-        """)
-
-        # Apply SQLite optimizations
-        self._apply_sqlite_optimizations(cursor)
-        self.vec_conn.commit()
-
-    def _apply_sqlite_optimizations(self, cursor) -> None:
-        """Apply SQLite performance pragmas for better performance."""
-        pragmas = [
-            "PRAGMA journal_mode = WAL",
-            "PRAGMA synchronous = NORMAL",
-            "PRAGMA cache_size = -100000",  # 100MB cache
-            "PRAGMA mmap_size = 2147483648",  # 2GB mmap
-            "PRAGMA temp_store = MEMORY",
-            "PRAGMA page_size = 4096",
-        ]
-        for pragma in pragmas:
-            try:
-                cursor.execute(pragma)
-            except Exception:
-                # Some pragmas may not be supported
-                pass
-
     def get_node_types(self) -> List[str]:
         """Get all node types in the graph."""
-        # KuzuDB uses a different syntax - we'll use a simple query
-        # For now, return the known node types
         return ["Concept", "Artifact", "Invariant", "Decision", "Anchor"]
 
     def close(self) -> None:
-        """Close database connections."""
+        """Close database connection."""
         if self.kuzu_conn:
             self.kuzu_conn.close()
-        if self.vec_conn:
-            self.vec_conn.close()
 
     def __enter__(self):
         """Context manager entry."""
@@ -224,7 +185,7 @@ class Hippocampus:
         Returns:
             The ID of the created node
         """
-        # Build parameterized query - KuzuDB needs explicit parameter references
+        # Build parameterized query
         prop_list = ", ".join([f"{k}: ${k}" for k in properties.keys()])
         query = f"CREATE (n:{node_type} {{{prop_list}}})"
         self.kuzu_conn.execute(query, properties)
@@ -235,7 +196,7 @@ class Hippocampus:
         src_id: str,
         dst_id: str,
         edge_type: str,
-        properties: Dict
+        properties: Optional[Dict] = None
     ) -> None:
         """
         Create an edge between two nodes.
@@ -244,18 +205,16 @@ class Hippocampus:
             src_id: Source node ID
             dst_id: Destination node ID
             edge_type: Type of edge (EVOKES, DEPENDS_ON, etc.)
-            properties: Edge properties
+            properties: Optional edge properties
         """
         # Build properties string
         if properties:
             prop_list = ", ".join([f"{k}: ${k}" for k in properties.keys()])
-            # Need to escape braces for f-string
             query = f"""
                 MATCH (src), (dst)
                 WHERE src.id = $src_id AND dst.id = $dst_id
-                CREATE (src)-[r:{edge_type} {{prop_list}}]->(dst)
+                CREATE (src)-[r:{edge_type} {{{prop_list}}}]->(dst)
             """
-            query = query.replace("{prop_list}", "{" + prop_list + "}")
             params = {
                 "src_id": src_id,
                 "dst_id": dst_id,
@@ -288,8 +247,6 @@ class Hippocampus:
 
         if result.has_next():
             row = result.get_next()
-            # In KuzuDB 0.5.0, when returning a node, it comes as a list
-            # with nested structure. We need to handle this properly.
             if row and len(row) > 0:
                 return row[0] if isinstance(row[0], dict) else {"data": row[0]}
         return None
@@ -319,59 +276,203 @@ class Hippocampus:
                     row_dict = dict(zip(column_names, row))
                     rows.append(row_dict)
                 else:
-                    # Fallback: return as-is
                     rows.append(row)
 
         return rows
 
-    def store_embedding(self, node_id: str, embedding: np.ndarray) -> None:
-        """
-        Store an embedding vector.
-
-        Args:
-            node_id: Node ID to associate with embedding
-            embedding: Vector to store (numpy array)
-        """
-        cursor = self.vec_conn.cursor()
-        # Ensure embedding is float32
-        embedding = embedding.astype(np.float32)
-        # sqlite-vec uses a different syntax - store as blob
-        cursor.execute(
-            "INSERT OR REPLACE INTO vec_embeddings(node_id, embedding) VALUES (?, ?)",
-            [node_id, embedding.tobytes()]
-        )
-        self.vec_conn.commit()
-
-    def similarity_search(
+    def create_artifact(
         self,
-        query_embedding: np.ndarray,
-        top_k: int = 10
-    ) -> List[Tuple[str, float]]:
+        artifact_id: str,
+        path: str,
+        content_hash: str,
+        language: str,
+        ast_fingerprint: str
+    ) -> None:
         """
-        Find similar embeddings by cosine similarity.
+        Create an artifact node.
+
+        Convenience method for artifact creation.
 
         Args:
-            query_embedding: Query vector
-            top_k: Number of results to return
+            artifact_id: Unique artifact ID
+            path: File path
+            content_hash: Hash of file content
+            language: Programming language
+            ast_fingerprint: AST structural hash
+        """
+        properties = {
+            "id": artifact_id,
+            "path": path,
+            "content_hash": content_hash,
+            "language": language,
+            "ast_fingerprint": ast_fingerprint,
+            "last_modified": None  # TODO: Add timestamp
+        }
+
+        self.create_node("Artifact", properties)
+
+    def create_dependency(
+        self,
+        src_id: str,
+        dst_id: str,
+        dependency_type: str = "import",
+        weight: float = 1.0
+    ) -> None:
+        """
+        Create DEPENDS_ON edge between artifacts.
+
+        Args:
+            src_id: Source artifact ID
+            dst_id: Dependency artifact ID
+            dependency_type: Type of dependency (import, require, etc.)
+            weight: Edge weight (default: 1.0)
+        """
+        properties = {
+            "dependency_type": dependency_type,
+            "weight": weight
+        }
+
+        self.create_edge(src_id, dst_id, "DEPENDS_ON", properties)
+
+    def get_dependencies(self, artifact_id: str) -> List[Dict]:
+        """
+        Get all dependencies for an artifact.
+
+        Args:
+            artifact_id: Artifact to query
 
         Returns:
-            List of (node_id, distance) tuples
+            List of dependency artifacts with metadata
         """
-        # For now, just retrieve all embeddings and compute similarity in Python
-        # TODO: Use proper sqlite-vec similarity search
-        cursor = self.vec_conn.cursor()
-        cursor.execute("SELECT node_id, embedding FROM vec_embeddings LIMIT ?", [top_k])
+        query = """
+            MATCH (a:Artifact)-[r:DEPENDS_ON]->(dep:Artifact)
+            WHERE a.id = $artifact_id
+            RETURN dep.id AS id, dep.path AS path,
+                   dep.language AS language, dep.ast_fingerprint AS fingerprint,
+                   r.dependency_type AS dep_type, r.weight AS weight
+        """
 
-        results = []
-        query_vec = query_embedding.astype(np.float32)
+        return self.execute_cypher(query, {"artifact_id": artifact_id})
 
-        for row in cursor.fetchall():
-            node_id = row[0]
-            emb_bytes = row[1]
-            # Convert bytes back to numpy array
-            stored_emb = np.frombuffer(emb_bytes, dtype=np.float32)
-            # Compute cosine similarity (1 - cosine distance)
-            similarity = float(np.dot(query_vec, stored_emb) / (np.linalg.norm(query_vec) * np.linalg.norm(stored_emb)))
-            results.append((node_id, 1.0 - similarity))  # Return distance
+    def get_dependents(self, artifact_id: str) -> List[Dict]:
+        """
+        Get all artifacts that depend on this one.
 
-        return results
+        Args:
+            artifact_id: Artifact to query
+
+        Returns:
+            List of dependent artifacts
+        """
+        query = """
+            MATCH (a:Artifact)-[r:DEPENDS_ON]->(dep:Artifact)
+            WHERE dep.id = $artifact_id
+            RETURN a.id AS id, a.path AS path,
+                   a.language AS language, a.ast_fingerprint AS fingerprint,
+                   r.dependency_type AS dep_type, r.weight AS weight
+        """
+
+        return self.execute_cypher(query, {"artifact_id": artifact_id})
+
+    def create_concept(
+        self,
+        concept_id: str,
+        name: str,
+        layer: str = "domain",
+        stability: float = 0.5
+    ) -> None:
+        """
+        Create a concept node.
+
+        Args:
+            concept_id: Unique concept ID
+            name: Concept name
+            layer: Concept layer (domain, task, etc.)
+            stability: Stability score (0-1)
+        """
+        properties = {
+            "id": concept_id,
+            "name": name,
+            "layer": layer,
+            "stability": stability,
+            "created_at": None  # TODO: Add timestamp
+        }
+
+        self.create_node("Concept", properties)
+
+    def create_evocation(
+        self,
+        artifact_id: str,
+        concept_id: str,
+        weight: float = 1.0
+    ) -> None:
+        """
+        Create EVOKES edge from artifact to concept.
+
+        Args:
+            artifact_id: Artifact ID
+            concept_id: Concept ID
+            weight: Association weight (0-1)
+        """
+        properties = {
+            "weight": weight,
+            "last_activated": None  # TODO: Add timestamp
+        }
+
+        self.create_edge(artifact_id, concept_id, "EVOKES", properties)
+
+    def get_artifacts_by_fingerprint(
+        self,
+        fingerprint: str,
+        limit: int = 10
+    ) -> List[Dict]:
+        """
+        Find artifacts with matching AST fingerprint.
+
+        Used for clone detection and structural similarity.
+
+        Args:
+            fingerprint: AST fingerprint to match
+            limit: Max number of results
+
+        Returns:
+            List of matching artifacts
+        """
+        query = """
+            MATCH (a:Artifact)
+            WHERE a.ast_fingerprint = $fingerprint
+            RETURN a.id AS id, a.path AS path, a.language AS language
+            LIMIT $limit
+        """
+
+        return self.execute_cypher(query, {
+            "fingerprint": fingerprint,
+            "limit": limit
+        })
+
+    def get_statistics(self) -> Dict:
+        """
+        Get database statistics.
+
+        Returns:
+            Dictionary with counts and metadata
+        """
+        stats = {}
+
+        # Count nodes by type
+        for node_type in ["Artifact", "Concept", "Invariant", "Decision", "Anchor"]:
+            query = f"MATCH (n:{node_type}) RETURN count(n) AS count"
+            result = self.execute_cypher(query, {})
+            stats[f"{node_type.lower()}_count"] = (
+                int(result[0]["count"]) if result else 0
+            )
+
+        # Count edges by type
+        for edge_type in ["EVOKES", "DEPENDS_ON", "CONSTRAINS", "PRECEDES", "RELATED_TO"]:
+            query = f"MATCH ()-[r:{edge_type}]->() RETURN count(r) AS count"
+            result = self.execute_cypher(query, {})
+            stats[f"{edge_type.lower()}_count"] = (
+                int(result[0]["count"]) if result else 0
+            )
+
+        return stats
