@@ -4,7 +4,10 @@ version = "0.1.0"
 description = "Cognitive memory system for code engineering"
 authors = ["Palace Team"]
 readme = "README.md"
-packages = [{include = "palace"}]
+packages = [
+    {include = "palace"},
+    {include = "mcp_server"}
+]
 
 [tool.poetry.dependencies]
 python = "^3.10"
@@ -17,6 +20,7 @@ pydantic = "^2.0.0"
 pydantic-settings = "^2.0.0"
 tenacity = "^8.2.0"
 python-dotenv = "^1.0.0"
+mcp = "^1.7.0"
 
 # Optional language-specific parsers
 tree-sitter-python = {version = "^0.20.0", optional = true}
@@ -43,6 +47,7 @@ pre-commit = "^3.3.0"
 
 [tool.poetry.scripts]
 palace = "palace.cli.commands:app"
+palace-mcp = "mcp_server.server:main"
 
 [build-system]
 requires = ["poetry-core"]

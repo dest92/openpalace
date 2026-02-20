@@ -1,6 +1,8 @@
 # 🚀 Palace Mental V2 - PRODUCTION READY
 
 > **46,583× compression** achieved | 322MB for 10M files | Validated on Linux kernel
+>
+> **🆕 MCP Server** - Model Context Protocol integration for AI agents
 
 ---
 
@@ -73,10 +75,50 @@ b6159d0  docs: add visual morning summary
 
 ## 📚 Documentation
 
+- **[docs/MCP_SERVER.md](docs/MCP_SERVER.md)** - MCP Server documentation
 - **[FINAL_NIGHT_SUMMARY.txt](FINAL_NIGHT_SUMMARY.txt)** - Comprehensive session log
 - **[BENCHMARK_RESULTS.md](BENCHMARK_RESULTS.md)** - Linux kernel validation
 - **[docs/PALACE_MENTAL_V2.md](docs/PALACE_MENTAL_V2.md)** - Full implementation guide
 - **[docs/V2_QUICKSTART.md](docs/V2_QUICKSTART.md)** - Quick start guide
+
+---
+
+## 🤖 MCP Server Integration
+
+Palace Mental V2 now includes a **Model Context Protocol (MCP) server** for seamless integration with AI agents and IDEs.
+
+### Quick Start
+
+```bash
+# Start the MCP server
+python -m mcp_server.server
+
+# Or use the CLI command
+poetry run palace-mcp
+```
+
+### Features
+
+- **Tools**: Query artifacts, compress code, index files
+- **Resources**: Statistics, metadata, dependency graphs
+- **Prompts**: Reusable interaction templates
+
+### IDE Configuration
+
+Add to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "palace-mental": {
+      "command": "python",
+      "args": ["/path/to/palace2/mcp_server/server.py"]
+    }
+  }
+}
+```
+
+See [docs/MCP_SERVER.md](docs/MCP_SERVER.md) for full documentation.
 
 ---
 

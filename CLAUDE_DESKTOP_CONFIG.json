@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "palace-mental": {
+      "command": "python",
+      "args": [
+        "/home/ben10/palace2/mcp_server/server.py"
+      ],
+      "env": {
+        "PYTHONPATH": "/home/ben10/palace2"
+      }
+    }
+  }
+}
