@@ -98,9 +98,13 @@ async def server_lifespan(server: FastMCP) -> AsyncIterator[Dict[str, Any]]:
         logger.info("🧹 Shutting down Palace Mental MCP Server...")
 
         try:
-            if "hippocampus" in _app_state:
-                _app_state["hippocampus"].close()
-                logger.info("✅ Hippocampus connection closed")
+            # Close hippocampus connection if it was successfully initialized
+            # Check if the variable exists in the exception handler scope
+            hippocampus.close()
+            logger.info("✅ Hippocampus connection closed")
+        except NameError:
+            # hippocampus was never initialized
+            logger.debug("ℹ️  Hippocampus not initialized, skipping cleanup")
         except Exception as e:
             logger.error(f"⚠️  Error during shutdown: {e}", exc_info=True)
 

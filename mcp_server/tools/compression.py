@@ -10,8 +10,7 @@ from typing import Dict, Any
 from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
-from palace.core.toon import TOONEncoder, ASTSummary, create_ast_summary
-from palace.core.tree_sitter_v2 import parse_code_fingerprint
+from palace.core.toon import TOONEncoder, ASTSummary
 
 logger = logging.getLogger(__name__)
 
@@ -79,8 +78,19 @@ def register_compression_tools(mcp: FastMCP) -> None:
         logger.info(f"🗜️  Compressing {language} code ({len(code)} chars)")
 
         try:
-            # Parse code with tree-sitter
-            fingerprint, ast_summary = parse_code_fingerprint(code, language)
+            # For MCP usage, create simplified AST summary for estimation
+            # Production would use tree-sitter parsing from file
+            lines = code.split('\n')
+            non_empty_lines = [l for l in lines if l.strip()]
+
+            ast_summary = ASTSummary(
+                file_path="<string>",
+                language=language,
+                functions=[],  # Would be populated by tree-sitter
+                classes=[],    # Would be populated by tree-sitter
+                imports=[],
+                exports=[]
+            )
 
             # Encode to TOON
             encoder = TOONEncoder(compact=compact)

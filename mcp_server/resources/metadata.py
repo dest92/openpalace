@@ -103,7 +103,7 @@ def register_metadata_resources(mcp: FastMCP) -> None:
             return f'{{"error": "{str(e)}"}}'
 
     @mcp.resource("artifact://{artifact_id}/dependencies")
-    def get_dependency_graph(artifact_id: str, max_depth: int = 2) -> str:
+    def get_dependency_graph(artifact_id: str) -> str:
         """
         Get dependency graph for an artifact.
 
@@ -112,21 +112,19 @@ def register_metadata_resources(mcp: FastMCP) -> None:
         - Transitive dependencies (depth >1)
         - Dependency relationships
 
-        Resource URI pattern: artifact://{artifact_id}/dependencies?max_depth=2
+        Resource URI pattern: artifact://{artifact_id}/dependencies
 
         Args:
             artifact_id: Artifact ID or file path
-            max_depth: Maximum depth of graph traversal (default: 2, max: 5)
 
         Returns:
             JSON-formatted dependency graph
 
         Examples:
             artifact://artifact-123/dependencies
-            artifact://src/auth/authenticate.py/dependencies?max_depth=3
+            artifact://src/auth/authenticate.py/dependencies
         """
-        if max_depth < 1 or max_depth > 5:
-            return '{"error": "max_depth must be between 1 and 5"}'
+        max_depth = 2  # Fixed depth for resource
 
         hippocampus = mcp.get_context("hippocampus")
         if not hippocampus:
@@ -170,7 +168,7 @@ def register_metadata_resources(mcp: FastMCP) -> None:
             # Format as hierarchical structure
             graph = {
                 "artifact": artifact_id,
-                "max_depth": max_depth,
+                "max_depth": 2,  # Fixed depth
                 "total_dependencies": len(result),
                 "by_depth": {
                     str(depth): [

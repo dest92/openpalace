@@ -1,7 +1,7 @@
 """Optimal database configuration settings for Palace Mental."""
 
 # KuzuDB optimal configuration
-# Based on KuzuDB 0.11.3 Database() parameters
+# Based on KuzuDB 0.5.0 Database() parameters (current installed version)
 KUZU_OPTIMAL_CONFIG = {
     # Buffer pool size in bytes (default: ~80% of system memory)
     # 1GB buffer pool for large datasets
@@ -12,18 +12,12 @@ KUZU_OPTIMAL_CONFIG = {
     'max_num_threads': 8,
 
     # Maximum database size in bytes (default: 8TB)
-    # MUST be a power of 2 for KuzuDB 0.11.3+
+    # MUST be a power of 2 for KuzuDB 0.5.0+
     # 16GB limit for controlled growth
     'max_db_size': 17179869184,  # 16GB (2^34)
 
     # Enable database compression (default: True)
     'compression': True,
-
-    # Auto checkpoint after writes (default: True)
-    'auto_checkpoint': True,
-
-    # Checkpoint threshold in bytes (-1 = use default)
-    'checkpoint_threshold': -1,
 }
 
 # SQLite+vec optimal configuration
